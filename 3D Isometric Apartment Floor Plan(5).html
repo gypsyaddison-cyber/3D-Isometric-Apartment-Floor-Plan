@@ -1,0 +1,1450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Two-Story Neighborhood - Smooth & Controlled Inspection</title>
+    <style>
+        * { box-sizing: border-box; user-select: none; }
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #ebe9e4;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+        #info {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: #2c3038;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 14px 20px;
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+            pointer-events: none;
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255,255,255,0.6);
+            max-width: 420px;
+        }
+        #info h1 { margin: 0 0 4px 0; font-size: 16px; font-weight: 700; letter-spacing: -0.3px; }
+        #info p { margin: 0; font-size: 12px; color: #5c626e; line-height: 1.4; }
+        #tour-status {
+            display: inline-block;
+            margin-top: 6px;
+            padding: 3px 8px;
+            background: #ff9f43;
+            color: #16181d;
+            font-weight: 700;
+            font-size: 11px;
+            border-radius: 6px;
+        }
+
+        #ui-panel {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 325px;
+            max-height: calc(100vh - 40px);
+            overflow-y: auto;
+            background: rgba(22, 25, 31, 0.88);
+            color: #f0f2f5;
+            padding: 16px;
+            border-radius: 14px;
+            box-shadow: 0 12px 32px rgba(0,0,0,0.25);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255,255,255,0.12);
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        #ui-panel::-webkit-scrollbar { width: 5px; }
+        #ui-panel::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 4px; }
+
+        .panel-section { display: flex; flex-direction: column; gap: 6px; }
+        .section-title {
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: #9aa4b8;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .value-badge {
+            color: #fff;
+            font-weight: 600;
+            font-size: 11px;
+            background: rgba(255,255,255,0.14);
+            padding: 2px 7px;
+            border-radius: 6px;
+        }
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 6px;
+            background: rgba(255,255,255,0.18);
+            border-radius: 4px;
+            outline: none;
+            cursor: pointer;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            background: #ff9f43;
+            cursor: pointer;
+            box-shadow: 0 0 8px rgba(255, 159, 67, 0.6);
+        }
+        .btn-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+        .btn-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
+        button {
+            background: rgba(255, 255, 255, 0.09);
+            color: #e4e7ec;
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            padding: 7px 8px;
+            border-radius: 7px;
+            font-size: 11.5px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.16s ease;
+        }
+        button:hover { background: rgba(255, 255, 255, 0.2); color: #fff; }
+        button.active {
+            background: #ff9f43;
+            color: #16181d;
+            border-color: #ff9f43;
+            box-shadow: 0 3px 10px rgba(255, 159, 67, 0.35);
+        }
+        .divider { height: 1px; background: rgba(255,255,255,0.1); margin: 1px 0; }
+    </style>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+<body>
+    <div id="info">
+        <h1>2-Story Interactive Neighborhood</h1>
+        <p>Smooth Scroll &amp; Drag Enabled &bull; 5 Two-Story Homes &bull; Calm Traffic &amp; Residents</p>
+        <div id="tour-status">Viewing: Full Neighborhood Overview</div>
+    </div>
+
+    <div id="ui-panel">
+        <!-- Independent Building Tour Controls -->
+        <div class="panel-section">
+            <div class="section-title">
+                <span>Independent Building Tour</span>
+                <span id="tour-badge" class="value-badge">All Homes</span>
+            </div>
+            <div class="btn-grid-3">
+                <button class="tour-btn active" data-home="-1">Overview</button>
+                <button class="tour-btn" data-home="0">Home 1 (NW)</button>
+                <button class="tour-btn" data-home="1">Home 2 (NC)</button>
+                <button class="tour-btn" data-home="2">Home 3 (NE)</button>
+                <button class="tour-btn" data-home="3">Home 4 (SW)</button>
+                <button class="tour-btn" data-home="4">Home 5 (SE)</button>
+            </div>
+            <div class="section-title" style="margin-top: 3px;">
+                <span>Tour Floor Cutaway</span>
+            </div>
+            <div class="btn-grid-3">
+                <button class="floor-btn active" data-floor="all">Full 2-Story</button>
+                <button class="floor-btn" data-floor="2f">Inspect 2F</button>
+                <button class="floor-btn" data-floor="1f">Inspect 1F</button>
+            </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- Mouse / Scroll Sensitivity & Activity Speed -->
+        <div class="panel-section">
+            <div class="section-title">
+                <span>Scroll &amp; Drag Sensitivity</span>
+                <span id="sens-val" class="value-badge">0.22x (Gentle)</span>
+            </div>
+            <input type="range" id="sens-slider" min="0.05" max="1.0" step="0.01" value="0.22">
+
+            <div class="section-title" style="margin-top: 3px;">
+                <span>People &amp; Traffic Speed</span>
+                <span id="sim-val" class="value-badge">0.35x (Calm)</span>
+            </div>
+            <input type="range" id="sim-slider" min="0" max="1.5" step="0.05" value="0.35">
+            <button id="btn-pause-sim">Pause People &amp; Cars</button>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- Global Explode View Controls -->
+        <div class="panel-section">
+            <div class="section-title">
+                <span>Global Explode View</span>
+                <span id="explode-val" class="value-badge">0%</span>
+            </div>
+            <input type="range" id="explode-slider" min="0" max="1" step="0.01" value="0">
+            <div class="btn-grid-2">
+                <button id="btn-roof-peek">Lift All Roofs</button>
+                <button id="btn-full-explode">Full Explode</button>
+            </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- Orbital & Speed Controls -->
+        <div class="panel-section">
+            <div class="section-title">
+                <span>Auto-Orbit Speed</span>
+                <span id="speed-val" class="value-badge">0.25x</span>
+            </div>
+            <button id="btn-orbit">Auto-Orbit: OFF</button>
+            <input type="range" id="speed-slider" min="0" max="2.0" step="0.05" value="0.25">
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- Day / Night Controls -->
+        <div class="panel-section">
+            <div class="section-title">
+                <span>Time of Day</span>
+                <span id="time-val" class="value-badge">13:30 (Day)</span>
+            </div>
+            <input type="range" id="time-slider" min="0" max="24" step="0.1" value="13.5">
+            <div class="btn-grid-3">
+                <button id="btn-day" class="active">Daylight</button>
+                <button id="btn-sunset">Sunset</button>
+                <button id="btn-night">Night</button>
+            </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- Camera & Zoom -->
+        <div class="panel-section">
+            <div class="section-title">
+                <span>Camera Angles &amp; Gentle Zoom</span>
+            </div>
+            <div class="btn-grid-2">
+                <button id="cam-iso">Isometric View</button>
+                <button id="cam-top">Top Master Plan</button>
+                <button id="cam-zoom-in">Zoom In (+)</button>
+                <button id="cam-zoom-out">Zoom Out (-)</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+
+        // --- 1. SCENE, CAMERA & RENDERER ---
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xebe9e4);
+
+        const aspect = window.innerWidth / window.innerHeight;
+        const d = 25;
+        const camera = new THREE.OrthographicCamera(-d * aspect, d * aspect, d, -d, 1, 260);
+        camera.position.set(38, 44, 42);
+        camera.lookAt(0, 0, 0);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.05;
+        document.body.appendChild(renderer.domElement);
+
+        // --- GENTLE, CONTROLLED ORBIT CONTROLS ---
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.08;
+        controls.zoomSpeed = 0.22;       // Very gentle scroll wheel zoom
+        controls.rotateSpeed = 0.33;     // Smooth, slow orbit drag
+        controls.panSpeed = 0.33;        // Smooth, slow pan drag
+        controls.minZoom = 0.45;
+        controls.maxZoom = 5.0;
+        controls.maxPolarAngle = Math.PI / 2 - 0.03;
+        controls.autoRotate = false;
+        controls.autoRotateSpeed = 0.35;
+
+        // Cancel any automated camera fly-to if the user manually interacts with the canvas
+        let camAnim = null;
+        renderer.domElement.addEventListener('pointerdown', () => { camAnim = null; });
+        renderer.domElement.addEventListener('wheel', () => { camAnim = null; }, { passive: true });
+
+        // --- 2. PROCEDURAL TEXTURES ---
+        function createOakTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 512; canvas.height = 512;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#c89d6c';
+            ctx.fillRect(0, 0, 512, 512);
+            const shades = ['#c29665', '#ce9f6f', '#b88b5a', '#d2a675'];
+            for (let y = 0; y < 512; y += 32) {
+                let xOffset = (y / 32) % 2 === 0 ? 0 : 128;
+                for (let x = -128; x < 512; x += 256) {
+                    ctx.fillStyle = shades[Math.floor(Math.random() * shades.length)];
+                    ctx.fillRect(x + xOffset, y, 256, 32);
+                    ctx.strokeStyle = '#9e7346';
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(x + xOffset, y, 256, 32);
+                }
+            }
+            const tex = new THREE.CanvasTexture(canvas);
+            tex.wrapS = THREE.RepeatWrapping; tex.wrapT = THREE.RepeatWrapping;
+            tex.repeat.set(4, 3.5);
+            tex.colorSpace = THREE.SRGBColorSpace;
+            return tex;
+        }
+
+        function createTileTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 256; canvas.height = 256;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#d0d2d1';
+            ctx.fillRect(0, 0, 256, 256);
+            ctx.strokeStyle = '#b5b8b6';
+            ctx.lineWidth = 3;
+            for (let i = 0; i <= 256; i += 64) {
+                ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, 256); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(256, i); ctx.stroke();
+            }
+            const tex = new THREE.CanvasTexture(canvas);
+            tex.wrapS = THREE.RepeatWrapping; tex.wrapT = THREE.RepeatWrapping;
+            tex.repeat.set(2, 2);
+            tex.colorSpace = THREE.SRGBColorSpace;
+            return tex;
+        }
+
+        function createRugTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 256; canvas.height = 256;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#9ea0a2';
+            ctx.fillRect(0, 0, 256, 256);
+            for (let i = 0; i < 8000; i++) {
+                ctx.fillStyle = Math.random() > 0.5 ? '#8e9092' : '#aeb0b2';
+                ctx.fillRect(Math.random() * 256, Math.random() * 256, 2, 2);
+            }
+            const tex = new THREE.CanvasTexture(canvas);
+            tex.colorSpace = THREE.SRGBColorSpace;
+            return tex;
+        }
+
+        function createMarbleTexture(baseHex, veinHex) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 256; canvas.height = 256;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = baseHex;
+            ctx.fillRect(0, 0, 256, 256);
+            ctx.strokeStyle = veinHex;
+            ctx.lineWidth = 1.5;
+            for (let i = 0; i < 8; i++) {
+                ctx.beginPath();
+                ctx.moveTo(Math.random() * 256, 0);
+                ctx.bezierCurveTo(Math.random() * 256, 80, Math.random() * 256, 160, Math.random() * 256, 256);
+                ctx.stroke();
+            }
+            const tex = new THREE.CanvasTexture(canvas);
+            tex.colorSpace = THREE.SRGBColorSpace;
+            return tex;
+        }
+
+        function createRoofShingleTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 512; canvas.height = 512;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#383c42';
+            ctx.fillRect(0, 0, 512, 512);
+            ctx.strokeStyle = '#2b2e33';
+            ctx.lineWidth = 2;
+            for (let y = 0; y < 512; y += 32) {
+                ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(512, y); ctx.stroke();
+            }
+            const tex = new THREE.CanvasTexture(canvas);
+            tex.wrapS = THREE.RepeatWrapping; tex.wrapT = THREE.RepeatWrapping;
+            tex.repeat.set(3, 3);
+            tex.colorSpace = THREE.SRGBColorSpace;
+            return tex;
+        }
+
+        // --- 3. SHARED MATERIALS ---
+        const mats = {
+            wall: new THREE.MeshStandardMaterial({ color: 0xfcfcfc, roughness: 0.85 }),
+            wallTop: new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.6 }),
+            oakFloor: new THREE.MeshStandardMaterial({ map: createOakTexture(), roughness: 0.35 }),
+            tileFloor: new THREE.MeshStandardMaterial({ map: createTileTexture(), roughness: 0.3 }),
+            rug: new THREE.MeshStandardMaterial({ map: createRugTexture(), roughness: 0.95 }),
+            sofaBeige: new THREE.MeshStandardMaterial({ color: 0xe8e0d5, roughness: 0.85 }),
+            sageGreen: new THREE.MeshStandardMaterial({ color: 0x7d9478, roughness: 0.8 }),
+            cream: new THREE.MeshStandardMaterial({ color: 0xf7f4eb, roughness: 0.8 }),
+            taupe: new THREE.MeshStandardMaterial({ color: 0xb5a898, roughness: 0.85 }),
+            woodWarm: new THREE.MeshStandardMaterial({ color: 0xa67346, roughness: 0.45 }),
+            woodDark: new THREE.MeshStandardMaterial({ color: 0x3b2a1e, roughness: 0.5 }),
+            charcoal: new THREE.MeshStandardMaterial({ color: 0x2f3236, roughness: 0.7 }),
+            beigeMarble: new THREE.MeshStandardMaterial({ map: createMarbleTexture('#e8dec8', '#cfc2a9'), roughness: 0.2 }),
+            whiteMarble: new THREE.MeshStandardMaterial({ map: createMarbleTexture('#f7f7f7', '#d9d9d9'), roughness: 0.15 }),
+            whiteGloss: new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.15 }),
+            blackGloss: new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.1, metalness: 0.4 }),
+            chrome: new THREE.MeshStandardMaterial({ color: 0xdcdcdc, roughness: 0.15, metalness: 0.9 }),
+            plantGreen: new THREE.MeshStandardMaterial({ color: 0x456e3e, roughness: 0.65 }),
+            potWhite: new THREE.MeshStandardMaterial({ color: 0xeeeeee, roughness: 0.5 }),
+            lampGlow: new THREE.MeshStandardMaterial({ color: 0xfff5e6, emissive: 0xffaa44, emissiveIntensity: 1.5 }),
+            ledGlow: new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xffd28e, emissiveIntensity: 1.4 }),
+            headlightGlow: new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xfff3cc, emissiveIntensity: 2.5 }),
+            taillightGlow: new THREE.MeshStandardMaterial({ color: 0xff2222, emissive: 0xff1111, emissiveIntensity: 2.0 }),
+            mirror: new THREE.MeshStandardMaterial({ color: 0xeef5ff, roughness: 0.02, metalness: 0.95 }),
+            glass: new THREE.MeshPhysicalMaterial({ color: 0xffffff, transparent: true, opacity: 0.34, roughness: 0.1, transmission: 0.6 }),
+            carGlass: new THREE.MeshStandardMaterial({ color: 0x1c2430, roughness: 0.1, metalness: 0.8 }),
+            sheerCurtain: new THREE.MeshPhysicalMaterial({ color: 0xffffff, transparent: true, opacity: 0.65, roughness: 0.9, side: THREE.DoubleSide }),
+            roofDeck: new THREE.MeshStandardMaterial({ map: createRoofShingleTexture(), roughness: 0.75 }),
+            roofTrim: new THREE.MeshStandardMaterial({ color: 0x23262b, roughness: 0.5, metalness: 0.2 }),
+            solarPanel: new THREE.MeshStandardMaterial({ color: 0x162436, roughness: 0.15, metalness: 0.7 }),
+            grass: new THREE.MeshStandardMaterial({ color: 0x9ab087, roughness: 0.92 }),
+            asphalt: new THREE.MeshStandardMaterial({ color: 0x3b3e45, roughness: 0.85 }),
+            sidewalk: new THREE.MeshStandardMaterial({ color: 0xd8d6d0, roughness: 0.8 }),
+            roadLine: new THREE.MeshStandardMaterial({ color: 0xf2d675, roughness: 0.6 }),
+            tireRubber: new THREE.MeshStandardMaterial({ color: 0x1b1c1e, roughness: 0.85 })
+        };
+
+        // --- 4. TRACKING ARRAYS ---
+        const housesData = [];
+        const allHumans = [];
+        const allCars = [];
+        const interiorLights = [];
+        const streetLights = [];
+        const carHeadlights = [];
+
+        // --- 5. REUSABLE ARTICULATED HUMAN BUILDER ---
+        function createWalkingHuman(parentGroup, config) {
+            const root = new THREE.Group();
+            const body = new THREE.Group();
+            root.add(body);
+
+            const skinMat = new THREE.MeshStandardMaterial({ color: config.skinColor, roughness: 0.6 });
+            const topMat = new THREE.MeshStandardMaterial({ color: config.topColor, roughness: 0.8 });
+            const pantsMat = new THREE.MeshStandardMaterial({ color: config.pantsColor, roughness: 0.8 });
+            const hairMat = new THREE.MeshStandardMaterial({ color: config.hairColor, roughness: 0.7 });
+            const shoeMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.4 });
+
+            const headGroup = new THREE.Group();
+            headGroup.position.y = 1.52;
+            const head = new THREE.Mesh(new THREE.SphereGeometry(0.115, 14, 14), skinMat);
+            head.castShadow = true;
+            headGroup.add(head);
+
+            const hair = new THREE.Mesh(
+                new THREE.SphereGeometry(0.122, 14, 14, 0, Math.PI * 2, 0, Math.PI * 0.62),
+                hairMat
+            );
+            hair.rotation.x = -0.25;
+            hair.position.y = 0.01;
+            headGroup.add(hair);
+
+            if (config.hasBun) {
+                const bun = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 8), hairMat);
+                bun.position.set(0, 0.06, -0.11);
+                headGroup.add(bun);
+            }
+            body.add(headGroup);
+
+            const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.05, 0.1, 8), skinMat);
+            neck.position.y = 1.38;
+            body.add(neck);
+
+            const torso = new THREE.Mesh(new RoundedBoxGeometry(0.32, 0.52, 0.18, 2, 0.07), topMat);
+            torso.position.y = 1.10;
+            torso.castShadow = true;
+            body.add(torso);
+
+            const hips = new THREE.Mesh(new RoundedBoxGeometry(0.30, 0.16, 0.17, 2, 0.05), pantsMat);
+            hips.position.y = 0.80;
+            body.add(hips);
+
+            function createLimb(xOffset, yPivot, length, radius, mat, isLeg) {
+                const pivot = new THREE.Group();
+                pivot.position.set(xOffset, yPivot, 0);
+                const limbMesh = new THREE.Mesh(new THREE.CapsuleGeometry(radius, length, 5, 8), mat);
+                limbMesh.position.y = -length / 2 - radius;
+                limbMesh.castShadow = true;
+                pivot.add(limbMesh);
+
+                if (isLeg) {
+                    const shoe = new THREE.Mesh(new RoundedBoxGeometry(0.095, 0.07, 0.19, 2, 0.03), shoeMat);
+                    shoe.position.set(0, -length - radius * 1.6, 0.035);
+                    pivot.add(shoe);
+                } else {
+                    const hand = new THREE.Mesh(new THREE.SphereGeometry(radius * 0.95, 6, 6), skinMat);
+                    hand.position.set(0, -length - radius * 1.9, 0);
+                    pivot.add(hand);
+                }
+                body.add(pivot);
+                return pivot;
+            }
+
+            const leftArm = createLimb(-0.21, 1.31, 0.36, 0.042, topMat, false);
+            const rightArm = createLimb(0.21, 1.31, 0.36, 0.042, topMat, false);
+            const leftLeg = createLimb(-0.085, 0.75, 0.52, 0.055, pantsMat, true);
+            const rightLeg = createLimb(0.085, 0.75, 0.52, 0.055, pantsMat, true);
+
+            if (config.scale) root.scale.setScalar(config.scale);
+            parentGroup.add(root);
+
+            const humanObj = {
+                root, body, leftArm, rightArm, leftLeg, rightLeg, headGroup,
+                waypoints: config.waypoints,
+                currentWp: config.startWp || 0,
+                speed: config.speed || 1.0,
+                walkTime: Math.random() * 10
+            };
+            root.position.copy(humanObj.waypoints[humanObj.currentWp]);
+            allHumans.push(humanObj);
+            return humanObj;
+        }
+
+        // --- 6. TWO-STORY BUILDING FACTORY ---
+        const storyHeight = 2.8;
+
+        function createTwoStoryBuilding(houseIndex, name, xPos, zPos, rotY) {
+            const houseRoot = new THREE.Group();
+            houseRoot.position.set(xPos, 0, zPos);
+            houseRoot.rotation.y = rotY;
+            scene.add(houseRoot);
+
+            const story1Group = new THREE.Group();
+            const story2Group = new THREE.Group();
+            story2Group.position.y = storyHeight;
+            const roofGroup = new THREE.Group();
+            roofGroup.position.y = storyHeight * 2;
+
+            houseRoot.add(story1Group, story2Group, roofGroup);
+
+            function populateFloor(floorParent, isSecondFloor) {
+                const floorSlabGroup = new THREE.Group();
+                const wallsGroup = new THREE.Group();
+                const furnitureGroup = new THREE.Group();
+                floorParent.add(floorSlabGroup, wallsGroup, furnitureGroup);
+
+                function addBox(parent, w, h, d, mat, x, y, z) {
+                    const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+                    mesh.position.set(x, y, z);
+                    mesh.castShadow = true; mesh.receiveShadow = true;
+                    parent.add(mesh);
+                    return mesh;
+                }
+
+                function addRBox(parent, w, h, d, mat, x, y, z, r = 0.06, ry = 0) {
+                    const mesh = new THREE.Mesh(new RoundedBoxGeometry(w, h, d, 4, r), mat);
+                    mesh.position.set(x, y, z);
+                    if (ry) mesh.rotation.y = ry;
+                    mesh.castShadow = true; mesh.receiveShadow = true;
+                    parent.add(mesh);
+                    return mesh;
+                }
+
+                function addCyl(parent, rt, rb, h, mat, x, y, z, segs = 18) {
+                    const mesh = new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, segs), mat);
+                    mesh.position.set(x, y, z);
+                    mesh.castShadow = true; mesh.receiveShadow = true;
+                    parent.add(mesh);
+                    return mesh;
+                }
+
+                function addNightstandAndLamp(x, z) {
+                    addRBox(furnitureGroup, 0.5, 0.45, 0.45, mats.woodWarm, x, 0.225, z, 0.02);
+                    addRBox(furnitureGroup, 0.46, 0.16, 0.02, mats.woodDark, x, 0.3, z + 0.23, 0.01);
+                    addCyl(furnitureGroup, 0.08, 0.1, 0.12, mats.woodDark, x, 0.51, z, 10);
+                    addCyl(furnitureGroup, 0.11, 0.14, 0.2, mats.lampGlow, x, 0.68, z, 14);
+                }
+
+                function addPlant(x, z, scale = 1) {
+                    const g = new THREE.Group();
+                    const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.18 * scale, 0.13 * scale, 0.35 * scale, 10), mats.potWhite);
+                    pot.position.y = 0.175 * scale;
+                    pot.castShadow = true;
+                    g.add(pot);
+
+                    [[0, 0.45, 0, 0.18], [-0.1, 0.55, 0.08, 0.14], [0.12, 0.52, -0.06, 0.15]].forEach(([fx, fy, fz, fr]) => {
+                        const leaf = new THREE.Mesh(new THREE.DodecahedronGeometry(fr * scale, 1), mats.plantGreen);
+                        leaf.position.set(fx * scale, fy * scale, fz * scale);
+                        leaf.castShadow = true;
+                        g.add(leaf);
+                    });
+                    g.position.set(x, 0, z);
+                    furnitureGroup.add(g);
+                }
+
+                // --- A. FLOOR SLABS ---
+                if (!isSecondFloor) {
+                    addBox(floorSlabGroup, 12.2, 0.3, 10.2, mats.wall, 0, -0.15, 0);
+                    addBox(floorSlabGroup, 12, 0.02, 10, mats.oakFloor, 0, 0.01, 0);
+                } else {
+                    addBox(floorSlabGroup, 12.2, 0.22, 6.2, mats.wall, 0, -0.11, -1.9);
+                    addBox(floorSlabGroup, 12.0, 0.02, 6.2, mats.oakFloor, 0, 0.01, -1.9);
+
+                    addBox(floorSlabGroup, 12.2, 0.22, 1.4, mats.wall, 0, -0.11, 4.3);
+                    addBox(floorSlabGroup, 12.0, 0.02, 1.4, mats.oakFloor, 0, 0.01, 4.3);
+
+                    addBox(floorSlabGroup, 5.15, 0.22, 2.4, mats.wall, -3.525, -0.11, 2.4);
+                    addBox(floorSlabGroup, 5.05, 0.02, 2.4, mats.oakFloor, -3.475, 0.01, 2.4);
+
+                    addBox(floorSlabGroup, 6.05, 0.22, 2.4, mats.wall, 3.075, -0.11, 2.4);
+                    addBox(floorSlabGroup, 5.95, 0.02, 2.4, mats.oakFloor, 3.025, 0.01, 2.4);
+
+                    addBox(wallsGroup, 0.05, 0.95, 2.4, mats.glass, -0.95, 0.475, 2.4);
+                    addBox(wallsGroup, 1.0, 0.95, 0.05, mats.glass, -0.45, 0.475, 3.6);
+                    addBox(wallsGroup, 0.07, 0.05, 2.44, mats.woodDark, -0.95, 0.95, 2.4);
+                    addBox(wallsGroup, 1.04, 0.05, 0.07, mats.woodDark, -0.45, 0.95, 3.6);
+                }
+
+                addBox(floorSlabGroup, 3.0, 0.03, 4.0, mats.tileFloor, 0, 0.015, -3.0);
+
+                // --- B. INTERIOR STAIRCASE ---
+                if (!isSecondFloor) {
+                    const numSteps = 12;
+                    for (let i = 0; i < numSteps; i++) {
+                        const sy = (i + 0.5) * (storyHeight / numSteps);
+                        const sz = 3.5 - i * (2.2 / numSteps);
+                        addRBox(furnitureGroup, 0.88, 0.06, 0.24, mats.woodWarm, -0.45, sy, sz, 0.01);
+                    }
+                    const stringer = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.18, 3.55), mats.woodDark);
+                    stringer.position.set(-0.45, storyHeight / 2 - 0.1, 2.4);
+                    stringer.rotation.x = Math.atan2(storyHeight, 2.2);
+                    furnitureGroup.add(stringer);
+
+                    const rail = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.85, 3.4), mats.glass);
+                    rail.position.set(-0.9, storyHeight / 2 + 0.35, 2.4);
+                    rail.rotation.x = Math.atan2(storyHeight, 2.2);
+                    furnitureGroup.add(rail);
+                }
+
+                // --- C. CUTAWAY WALLS ---
+                const wallT = 0.18;
+                const backH = 2.65;
+                const midH = 1.95;
+                const frontH = 0.75;
+
+                function buildWall(w, h, d, x, z) {
+                    addBox(wallsGroup, w, h, d, mats.wall, x, h / 2, z);
+                    addBox(wallsGroup, w + 0.01, 0.02, d + 0.01, mats.wallTop, x, h + 0.01, z);
+                }
+
+                buildWall(12.18, backH, wallT, 0, -5);
+                buildWall(wallT, backH, 10.18, -6, 0);
+                buildWall(wallT, frontH, 10.18, 6, 0);
+                buildWall(5.3, frontH, wallT, -3.35, 5);
+                buildWall(5.3, frontH, wallT, 3.35, 5);
+
+                if (!isSecondFloor) {
+                    addBox(wallsGroup, 1.4, 1.35, 0.08, mats.whiteGloss, 0, 0.675, 5.0);
+                    addBox(wallsGroup, 0.15, 1.4, 0.22, mats.wall, -0.72, 0.7, 5.0);
+                    addBox(wallsGroup, 0.15, 1.4, 0.22, mats.wall, 0.72, 0.7, 5.0);
+                    addBox(wallsGroup, 0.04, 0.18, 0.14, mats.chrome, -0.5, 0.75, 5.0);
+                } else {
+                    addBox(wallsGroup, 1.4, 0.95, 0.06, mats.glass, 0, 0.475, 5.0);
+                    addBox(wallsGroup, 1.44, 0.05, 0.1, mats.charcoal, 0, 0.95, 5.0);
+                }
+
+                buildWall(wallT, midH + 0.3, 4.0, -1.5, -3.0);
+                buildWall(wallT, midH + 0.3, 4.0, 1.5, -3.0);
+                buildWall(3.2, midH, wallT, -4.4, -1.0);
+                buildWall(1.9, midH, wallT, -0.55, -1.0);
+                buildWall(3.2, midH, wallT, 4.4, -1.0);
+                buildWall(wallT, 1.3, 2.2, 0, 3.9);
+
+                // --- D. ROOM FURNITURE ---
+                for (let z = -4.6; z <= -1.4; z += 0.32) {
+                    addCyl(furnitureGroup, 0.08, 0.08, 2.5, mats.sheerCurtain, -5.8, 1.25, z, 8);
+                }
+                const bedAccent = isSecondFloor ? mats.taupe : mats.sageGreen;
+                addRBox(furnitureGroup, 0.18, 1.25, 1.85, bedAccent, -5.6, 0.625, -3.1, 0.05);
+                addRBox(furnitureGroup, 2.15, 0.32, 1.85, mats.woodWarm, -4.5, 0.16, -3.1, 0.02);
+                addRBox(furnitureGroup, 2.0, 0.28, 1.72, mats.cream, -4.45, 0.42, -3.1, 0.08);
+                addRBox(furnitureGroup, 0.65, 0.31, 1.76, bedAccent, -3.75, 0.43, -3.1, 0.06);
+                addRBox(furnitureGroup, 0.32, 0.14, 0.65, mats.cream, -5.2, 0.62, -3.5, 0.05, 0.08);
+                addRBox(furnitureGroup, 0.32, 0.14, 0.65, mats.cream, -5.2, 0.62, -2.7, 0.05, -0.08);
+                addNightstandAndLamp(-5.35, -4.35);
+                addNightstandAndLamp(-5.35, -1.85);
+
+                addBox(furnitureGroup, 0.6, 2.3, 2.4, mats.woodDark, -1.9, 1.15, -3.5);
+                addBox(furnitureGroup, 0.52, 2.18, 2.28, mats.woodWarm, -1.95, 1.15, -3.5);
+                addBox(furnitureGroup, 0.05, 2.15, 0.05, mats.ledGlow, -1.75, 1.15, -4.55);
+                addBox(furnitureGroup, 0.05, 2.15, 0.05, mats.ledGlow, -1.75, 1.15, -2.45);
+                addBox(furnitureGroup, 0.04, 2.22, 2.3, mats.glass, -1.62, 1.15, -3.5);
+
+                addRBox(furnitureGroup, 1.85, 1.2, 0.16, mats.taupe, 3.8, 0.6, -4.8, 0.04);
+                addRBox(furnitureGroup, 1.85, 0.32, 2.15, mats.woodWarm, 3.8, 0.16, -3.7, 0.02);
+                addRBox(furnitureGroup, 1.72, 0.28, 2.0, mats.sofaBeige, 3.8, 0.42, -3.65, 0.08);
+                addRBox(furnitureGroup, 1.76, 0.31, 0.7, mats.sageGreen, 3.8, 0.43, -2.95, 0.06);
+                addRBox(furnitureGroup, 0.65, 0.14, 0.32, mats.cream, 3.4, 0.62, -4.4, 0.05);
+                addRBox(furnitureGroup, 0.65, 0.14, 0.32, mats.cream, 4.2, 0.62, -4.4, 0.05);
+                addNightstandAndLamp(2.55, -4.6);
+                addNightstandAndLamp(5.05, -4.6);
+
+                addRBox(furnitureGroup, 0.24, 0.78, 0.44, mats.whiteGloss, -1.25, 0.55, -3.8, 0.04);
+                addRBox(furnitureGroup, 0.52, 0.42, 0.42, mats.whiteGloss, -1.0, 0.21, -3.8, 0.12);
+                addRBox(furnitureGroup, 1.5, 0.48, 0.56, mats.woodDark, 0.25, 0.58, -4.6, 0.02);
+                addRBox(furnitureGroup, 1.54, 0.08, 0.58, mats.whiteGloss, 0.25, 0.85, -4.6, 0.01);
+                addBox(furnitureGroup, 0.65, 0.05, 0.36, mats.tileFloor, 0.25, 0.87, -4.6);
+                addBox(furnitureGroup, 1.38, 0.98, 0.03, mats.ledGlow, 0.25, 1.55, -4.88);
+                addBox(furnitureGroup, 1.3, 0.9, 0.05, mats.mirror, 0.25, 1.55, -4.85);
+
+                addRBox(furnitureGroup, 3.7, 0.03, 3.2, mats.rug, -3.2, 0.02, 2.2, 0.01);
+                addRBox(furnitureGroup, 2.6, 0.42, 0.95, mats.sofaBeige, -3.45, 0.21, 3.3, 0.08);
+                addRBox(furnitureGroup, 0.95, 0.42, 1.35, mats.sofaBeige, -4.275, 0.21, 2.15, 0.08);
+                addRBox(furnitureGroup, 2.6, 0.48, 0.24, mats.sofaBeige, -3.45, 0.62, 3.66, 0.08);
+                addRBox(furnitureGroup, 0.24, 0.48, 2.3, mats.sofaBeige, -4.65, 0.62, 2.62, 0.08);
+                addRBox(furnitureGroup, 0.2, 0.35, 0.95, mats.sofaBeige, -2.15, 0.5, 3.3, 0.06);
+
+                addRBox(furnitureGroup, 0.42, 0.38, 0.16, mats.sageGreen, -4.2, 0.58, 3.42, 0.06, 0.15);
+                addRBox(furnitureGroup, 0.38, 0.35, 0.16, mats.cream, -3.75, 0.57, 3.45, 0.06, -0.1);
+                addRBox(furnitureGroup, 0.42, 0.38, 0.16, mats.sageGreen, -2.6, 0.58, 3.42, 0.06, -0.2);
+
+                addCyl(furnitureGroup, 0.6, 0.6, 0.06, mats.woodWarm, -3.0, 0.4, 1.9, 20);
+                addCyl(furnitureGroup, 0.05, 0.03, 0.38, mats.woodDark, -3.25, 0.2, 1.9, 8);
+                addCyl(furnitureGroup, 0.05, 0.03, 0.38, mats.woodDark, -2.8, 0.2, 2.1, 8);
+                addCyl(furnitureGroup, 0.05, 0.03, 0.38, mats.woodDark, -2.8, 0.2, 1.7, 8);
+
+                for (let x = -4.2; x <= -2.0; x += 0.12) {
+                    addBox(furnitureGroup, 0.05, 1.85, 0.05, mats.woodWarm, x, 0.925, -0.88);
+                }
+                addRBox(furnitureGroup, 2.3, 0.42, 0.45, mats.whiteGloss, -3.1, 0.24, -0.65, 0.02);
+                addBox(furnitureGroup, 1.55, 0.9, 0.05, mats.blackGloss, -3.1, 1.15, -0.83);
+                addPlant(-4.65, -0.55, 1.1);
+                addPlant(-1.55, -0.55, 1.0);
+
+                addBox(furnitureGroup, 3.7, 0.88, 0.65, mats.charcoal, 3.65, 0.44, -0.58);
+                addBox(furnitureGroup, 0.65, 0.88, 3.4, mats.charcoal, 5.58, 0.44, 1.45);
+                addBox(furnitureGroup, 3.1, 0.75, 0.38, mats.charcoal, 3.35, 1.65, -0.72);
+                addBox(furnitureGroup, 0.85, 2.1, 0.68, mats.charcoal, 5.35, 1.05, -0.55);
+
+                addRBox(furnitureGroup, 3.74, 0.06, 0.68, mats.beigeMarble, 3.65, 0.91, -0.58, 0.01);
+                addRBox(furnitureGroup, 0.68, 0.06, 3.44, mats.beigeMarble, 5.58, 0.91, 1.45, 0.01);
+                addBox(furnitureGroup, 0.85, 0.02, 0.5, mats.blackGloss, 3.35, 0.945, -0.58);
+
+                addRBox(furnitureGroup, 2.3, 0.92, 1.05, mats.whiteMarble, 3.1, 0.46, 1.85, 0.02);
+                addBox(furnitureGroup, 2.1, 0.85, 0.8, mats.charcoal, 3.1, 0.425, 1.75);
+                addBox(furnitureGroup, 0.75, 0.04, 0.45, mats.chrome, 3.1, 0.915, 1.75);
+                addBox(furnitureGroup, 0.68, 0.05, 0.38, mats.charcoal, 3.1, 0.92, 1.75);
+
+                [2.55, 3.65].forEach(bx => {
+                    addCyl(furnitureGroup, 0.2, 0.2, 0.06, mats.woodDark, bx, 0.66, 2.55, 16);
+                    addCyl(furnitureGroup, 0.025, 0.02, 0.65, mats.woodDark, bx - 0.12, 0.325, 2.45, 6);
+                    addCyl(furnitureGroup, 0.025, 0.02, 0.65, mats.woodDark, bx + 0.12, 0.325, 2.45, 6);
+                    addCyl(furnitureGroup, 0.025, 0.02, 0.65, mats.woodDark, bx - 0.12, 0.325, 2.65, 6);
+                    addCyl(furnitureGroup, 0.025, 0.02, 0.65, mats.woodDark, bx + 0.12, 0.325, 2.65, 6);
+                });
+
+                const roomLight = new THREE.PointLight(0xffa952, 2.0, 9.5, 1.4);
+                roomLight.position.set(isSecondFloor ? 2.5 : -2.5, 1.9, 0.2);
+                furnitureGroup.add(roomLight);
+                interiorLights.push(roomLight);
+
+                const palette1 = [0xc86d51, 0xd9822b, 0x6b8e78, 0xb85d6f, 0x7c6f94];
+                const palette2 = [0x4a6b82, 0x3b7a57, 0x8c6239, 0x52658f, 0x4f7566];
+
+                if (!isSecondFloor) {
+                    createWalkingHuman(furnitureGroup, {
+                        skinColor: 0xe0ac69,
+                        topColor: palette1[houseIndex % palette1.length],
+                        pantsColor: 0x2b3542,
+                        hairColor: 0x241811,
+                        hasBun: true,
+                        scale: 0.96,
+                        speed: 0.9 + (houseIndex * 0.02),
+                        startWp: houseIndex % 4,
+                        waypoints: [
+                            new THREE.Vector3(-3.0, 0.02, -2.5),
+                            new THREE.Vector3(-2.1, 0.02, -1.8),
+                            new THREE.Vector3(-2.1, 0.02, 0.4),
+                            new THREE.Vector3(-1.4, 0.02, 1.8),
+                            new THREE.Vector3(-1.4, 0.02, 3.8),
+                            new THREE.Vector3(-1.4, 0.02, 1.8),
+                            new THREE.Vector3(-2.1, 0.02, 0.4),
+                            new THREE.Vector3(-2.1, 0.02, -1.8)
+                        ]
+                    });
+                } else {
+                    createWalkingHuman(furnitureGroup, {
+                        skinColor: 0x8d5524,
+                        topColor: palette2[houseIndex % palette2.length],
+                        pantsColor: 0xd6cfc2,
+                        hairColor: 0x1a1512,
+                        hasBun: false,
+                        scale: 1.0,
+                        speed: 0.85 + (houseIndex * 0.02),
+                        startWp: (houseIndex + 2) % 5,
+                        waypoints: [
+                            new THREE.Vector3(2.2, 0.02, -2.6),
+                            new THREE.Vector3(2.1, 0.02, -1.5),
+                            new THREE.Vector3(1.5, 0.02, 0.3),
+                            new THREE.Vector3(1.4, 0.02, 2.9),
+                            new THREE.Vector3(3.1, 0.02, 3.5),
+                            new THREE.Vector3(1.4, 0.02, 2.9),
+                            new THREE.Vector3(1.5, 0.02, 0.3),
+                            new THREE.Vector3(2.1, 0.02, -1.5)
+                        ]
+                    });
+                }
+
+                return { floorSlabGroup, wallsGroup, furnitureGroup };
+            }
+
+            const f1 = populateFloor(story1Group, false);
+            const f2 = populateFloor(story2Group, true);
+
+            // --- E. ARCHITECTURAL ROOF ---
+            function addRoofBox(w, h, d, mat, x, y, z) {
+                const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+                mesh.position.set(x, y, z);
+                mesh.castShadow = true; mesh.receiveShadow = true;
+                roofGroup.add(mesh);
+                return mesh;
+            }
+
+            addRoofBox(13.0, 0.24, 3.9, mats.roofDeck, 0, 0, -3.25);
+            addRoofBox(13.0, 0.24, 3.9, mats.roofDeck, 0, 0, 3.25);
+            addRoofBox(4.7, 0.24, 2.6, mats.roofDeck, -4.15, 0, 0);
+            addRoofBox(4.7, 0.24, 2.6, mats.roofDeck, 4.15, 0, 0);
+
+            addRoofBox(13.2, 0.36, 0.16, mats.roofTrim, 0, 0.04, -5.2);
+            addRoofBox(13.2, 0.36, 0.16, mats.roofTrim, 0, 0.04, 5.2);
+            addRoofBox(0.16, 0.36, 10.55, mats.roofTrim, -6.52, 0.04, 0);
+            addRoofBox(0.16, 0.36, 10.55, mats.roofTrim, 6.52, 0.04, 0);
+
+            addRoofBox(3.7, 0.26, 0.12, mats.roofTrim, 0, 0.15, -1.3);
+            addRoofBox(3.7, 0.26, 0.12, mats.roofTrim, 0, 0.15, 1.3);
+            addRoofBox(0.12, 0.26, 2.7, mats.roofTrim, -1.8, 0.15, 0);
+            addRoofBox(0.12, 0.26, 2.7, mats.roofTrim, 1.8, 0.15, 0);
+            addRoofBox(3.6, 0.06, 2.6, mats.glass, 0, 0.25, 0);
+            addRoofBox(0.06, 0.08, 2.6, mats.roofTrim, -0.6, 0.25, 0);
+            addRoofBox(0.06, 0.08, 2.6, mats.roofTrim, 0.6, 0.25, 0);
+
+            for (let sx = -4.8; sx <= -2.4; sx += 1.2) {
+                const panel = addRoofBox(1.05, 0.05, 1.7, mats.solarPanel, sx, 0.16, -3.2);
+                panel.rotation.x = 0.08;
+            }
+            addRoofBox(0.9, 0.45, 0.7, mats.wall, 4.2, 0.32, -3.3);
+
+            housesData.push({
+                index: houseIndex,
+                name,
+                xPos, zPos, rotY,
+                houseRoot, story1Group, story2Group, roofGroup, f1, f2
+            });
+        }
+
+        // --- 7. BUILD THE 5 TWO-STORY HOMES ---
+        createTwoStoryBuilding(0, "Home 1 (North-West)",   -16, -12, 0);
+        createTwoStoryBuilding(1, "Home 2 (North-Center)",   0, -12, 0);
+        createTwoStoryBuilding(2, "Home 3 (North-East)",    16, -12, 0);
+        createTwoStoryBuilding(3, "Home 4 (South-West)",    -8,  12, Math.PI);
+        createTwoStoryBuilding(4, "Home 5 (South-East)",     8,  12, Math.PI);
+
+        // --- 8. NEIGHBORHOOD ENVIRONMENT, MOVING CARS & OUTDOOR PEDESTRIANS ---
+        const envGroup = new THREE.Group();
+        scene.add(envGroup);
+
+        const lawn = new THREE.Mesh(new RoundedBoxGeometry(58, 0.4, 44, 4, 0.15), mats.grass);
+        lawn.position.set(0, -0.38, 0);
+        lawn.receiveShadow = true;
+        envGroup.add(lawn);
+
+        const road = new THREE.Mesh(new THREE.BoxGeometry(58, 0.06, 6.8), mats.asphalt);
+        road.position.set(0, -0.16, 0);
+        road.receiveShadow = true;
+        envGroup.add(road);
+
+        for (let rx = -26; rx <= 26; rx += 4) {
+            const dash = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.07, 0.16), mats.roadLine);
+            dash.position.set(rx, -0.15, 0);
+            envGroup.add(dash);
+        }
+
+        const sidewalkN = new THREE.Mesh(new THREE.BoxGeometry(58, 0.12, 1.8), mats.sidewalk);
+        sidewalkN.position.set(0, -0.14, -4.3);
+        sidewalkN.receiveShadow = true;
+        envGroup.add(sidewalkN);
+
+        const sidewalkS = new THREE.Mesh(new THREE.BoxGeometry(58, 0.12, 1.8), mats.sidewalk);
+        sidewalkS.position.set(0, -0.14, 4.3);
+        sidewalkS.receiveShadow = true;
+        envGroup.add(sidewalkS);
+
+        [-16, 0, 16].forEach(wx => {
+            const path = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.1, 2.2), mats.sidewalk);
+            path.position.set(wx, -0.15, -6.1);
+            path.receiveShadow = true;
+            envGroup.add(path);
+        });
+        [-8, 8].forEach(wx => {
+            const path = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.1, 2.2), mats.sidewalk);
+            path.position.set(wx, -0.15, 6.1);
+            path.receiveShadow = true;
+            envGroup.add(path);
+        });
+
+        function createMovingCar(colorHex, startX, laneZ, dirX, speed) {
+            const car = new THREE.Group();
+            const bodyMat = new THREE.MeshStandardMaterial({ color: colorHex, roughness: 0.25, metalness: 0.6 });
+
+            const chassis = new THREE.Mesh(new RoundedBoxGeometry(3.3, 0.55, 1.55, 4, 0.12), bodyMat);
+            chassis.position.y = 0.45;
+            chassis.castShadow = true; chassis.receiveShadow = true;
+            car.add(chassis);
+
+            const cabin = new THREE.Mesh(new RoundedBoxGeometry(1.75, 0.48, 1.32, 4, 0.14), bodyMat);
+            cabin.position.set(-0.15 * dirX, 0.88, 0);
+            cabin.castShadow = true;
+            car.add(cabin);
+
+            const windshield = new THREE.Mesh(new RoundedBoxGeometry(1.82, 0.38, 1.36, 2, 0.06), mats.carGlass);
+            windshield.position.set(-0.15 * dirX, 0.87, 0);
+            car.add(windshield);
+
+            const frontX = 1.64 * dirX;
+            const backX = -1.64 * dirX;
+            [-0.5, 0.5].forEach(lz => {
+                const hl = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.14, 0.26), mats.headlightGlow);
+                hl.position.set(frontX, 0.48, lz);
+                car.add(hl);
+
+                const tl = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.12, 0.28), mats.taillightGlow);
+                tl.position.set(backX, 0.5, lz);
+                car.add(tl);
+            });
+
+            const beam = new THREE.PointLight(0xfff2cc, 0, 10, 1.5);
+            beam.position.set(frontX + dirX * 0.6, 0.6, 0);
+            car.add(beam);
+            carHeadlights.push(beam);
+
+            const wheels = [];
+            const wheelGeo = new THREE.CylinderGeometry(0.3, 0.3, 0.22, 16);
+            wheelGeo.rotateX(Math.PI / 2);
+            const hubGeo = new THREE.CylinderGeometry(0.16, 0.16, 0.24, 10);
+            hubGeo.rotateX(Math.PI / 2);
+
+            [[-1.02, -0.76], [1.02, -0.76], [-1.02, 0.76], [1.02, 0.76]].forEach(([wx, wz]) => {
+                const wGroup = new THREE.Group();
+                wGroup.position.set(wx, 0.3, wz);
+                const tire = new THREE.Mesh(wheelGeo, mats.tireRubber);
+                const hub = new THREE.Mesh(hubGeo, mats.chrome);
+                wGroup.add(tire, hub);
+                car.add(wGroup);
+                wheels.push(wGroup);
+            });
+
+            car.position.set(startX, -0.13, laneZ);
+            envGroup.add(car);
+            allCars.push({ car, wheels, dirX, speed, limit: 32 });
+        }
+
+        // Calm residential cruising speeds
+        createMovingCar(0xc93b2b, -22,  1.65,  1, 4.2);
+        createMovingCar(0x2f5d8c,   8,  1.65,  1, 4.2);
+        createMovingCar(0xd8dde6,  18, -1.65, -1, 3.8);
+        createMovingCar(0x3a404a, -12, -1.65, -1, 3.8);
+
+        // Outdoor Pedestrians on Sidewalks
+        createWalkingHuman(envGroup, {
+            skinColor: 0xe0ac69, topColor: 0xd96b43, pantsColor: 0x2b3542, hairColor: 0x241811,
+            hasBun: false, scale: 1.0, speed: 1.05, startWp: 0,
+            waypoints: [
+                new THREE.Vector3(-24, -0.08, -4.3),
+                new THREE.Vector3(  0, -0.08, -4.3),
+                new THREE.Vector3(  0, -0.08, -6.5),
+                new THREE.Vector3(  0, -0.08, -4.3),
+                new THREE.Vector3( 24, -0.08, -4.3),
+                new THREE.Vector3(-24, -0.08, -4.3)
+            ]
+        });
+        createWalkingHuman(envGroup, {
+            skinColor: 0x8d5524, topColor: 0x527a68, pantsColor: 0xe6e1d6, hairColor: 0x161210,
+            hasBun: true, scale: 0.96, speed: 0.95, startWp: 2,
+            waypoints: [
+                new THREE.Vector3( 22, -0.08, -4.0),
+                new THREE.Vector3( 16, -0.08, -4.0),
+                new THREE.Vector3( 16, -0.08, -6.4),
+                new THREE.Vector3( 16, -0.08, -4.0),
+                new THREE.Vector3(-20, -0.08, -4.0),
+                new THREE.Vector3( 22, -0.08, -4.0)
+            ]
+        });
+        createWalkingHuman(envGroup, {
+            skinColor: 0xf1c27d, topColor: 0x4b6584, pantsColor: 0x333842, hairColor: 0x4a3219,
+            hasBun: false, scale: 1.02, speed: 1.1, startWp: 1,
+            waypoints: [
+                new THREE.Vector3(-16, -0.08, -6.4),
+                new THREE.Vector3(-16, -0.08, -4.5),
+                new THREE.Vector3( 12, -0.08, -4.5),
+                new THREE.Vector3(-16, -0.08, -4.5)
+            ]
+        });
+        createWalkingHuman(envGroup, {
+            skinColor: 0xc68642, topColor: 0xe6b85c, pantsColor: 0x2f3640, hairColor: 0x1a1512,
+            hasBun: true, scale: 0.97, speed: 1.0, startWp: 0,
+            waypoints: [
+                new THREE.Vector3(-22, -0.08, 4.3),
+                new THREE.Vector3( -8, -0.08, 4.3),
+                new THREE.Vector3( -8, -0.08, 6.5),
+                new THREE.Vector3( -8, -0.08, 4.3),
+                new THREE.Vector3( 22, -0.08, 4.3),
+                new THREE.Vector3(-22, -0.08, 4.3)
+            ]
+        });
+        createWalkingHuman(envGroup, {
+            skinColor: 0xe0ac69, topColor: 0x8854d0, pantsColor: 0xdcdde1, hairColor: 0x2c1b12,
+            hasBun: false, scale: 1.0, speed: 1.05, startWp: 2,
+            waypoints: [
+                new THREE.Vector3( 24, -0.08, 4.0),
+                new THREE.Vector3(  8, -0.08, 4.0),
+                new THREE.Vector3(  8, -0.08, 6.5),
+                new THREE.Vector3(  8, -0.08, 4.0),
+                new THREE.Vector3(-18, -0.08, 4.0),
+                new THREE.Vector3( 24, -0.08, 4.0)
+            ]
+        });
+
+        // Outdoor Trees & Streetlamps
+        function addOutdoorTree(x, z, scale = 1) {
+            const tree = new THREE.Group();
+            const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.18 * scale, 0.26 * scale, 1.8 * scale, 10), mats.woodDark);
+            trunk.position.y = 0.7 * scale;
+            trunk.castShadow = true;
+            tree.add(trunk);
+
+            const crown1 = new THREE.Mesh(new THREE.DodecahedronGeometry(1.15 * scale, 1), mats.plantGreen);
+            crown1.position.set(0, 2.0 * scale, 0);
+            crown1.castShadow = true;
+            tree.add(crown1);
+
+            const crown2 = new THREE.Mesh(new THREE.DodecahedronGeometry(0.85 * scale, 1), mats.sageGreen);
+            crown2.position.set(0.45 * scale, 2.55 * scale, 0.3 * scale);
+            crown2.castShadow = true;
+            tree.add(crown2);
+
+            tree.position.set(x, -0.18, z);
+            envGroup.add(tree);
+        }
+
+        addOutdoorTree(-24.5, -10, 1.25);
+        addOutdoorTree(-8, -9.2, 1.05);
+        addOutdoorTree(8, -9.2, 1.1);
+        addOutdoorTree(24.5, -10, 1.2);
+        addOutdoorTree(-18, 10, 1.3);
+        addOutdoorTree(0, 9.2, 1.1);
+        addOutdoorTree(18, 10, 1.25);
+        addOutdoorTree(-22, 15.5, 1.0);
+        addOutdoorTree(22, 15.5, 1.15);
+
+        function addStreetLamp(x, z) {
+            const lamp = new THREE.Group();
+            const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.09, 3.8, 10), mats.charcoal);
+            pole.position.y = 1.75;
+            pole.castShadow = true;
+            lamp.add(pole);
+
+            const arm = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.7), mats.charcoal);
+            arm.position.set(0, 3.65, z < 0 ? 0.3 : -0.3);
+            lamp.add(arm);
+
+            const bulb = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.12, 0.12, 10), mats.lampGlow);
+            bulb.position.set(0, 3.6, z < 0 ? 0.55 : -0.55);
+            lamp.add(bulb);
+
+            const sLight = new THREE.PointLight(0xffb86c, 0, 15, 1.4);
+            sLight.position.set(0, 3.4, z < 0 ? 0.55 : -0.55);
+            lamp.add(sLight);
+            streetLights.push(sLight);
+
+            lamp.position.set(x, -0.15, z);
+            envGroup.add(lamp);
+        }
+
+        addStreetLamp(-18, -4.9);
+        addStreetLamp(-2, -4.9);
+        addStreetLamp(14, -4.9);
+        addStreetLamp(-10, 4.9);
+        addStreetLamp(6, 4.9);
+        addStreetLamp(20, 4.9);
+
+        // --- 9. GLOBAL LIGHTING (DAY / NIGHT SYSTEM) ---
+        const hemiLight = new THREE.HemisphereLight(0xffffff, 0xe8dfd5, 0.9);
+        hemiLight.position.set(0, 50, 0);
+        scene.add(hemiLight);
+
+        const dirLight = new THREE.DirectionalLight(0xfffcf5, 1.5);
+        dirLight.position.set(24, 42, 26);
+        dirLight.castShadow = true;
+        dirLight.shadow.mapSize.width = 2048;
+        dirLight.shadow.mapSize.height = 2048;
+        dirLight.shadow.camera.near = 1;
+        dirLight.shadow.camera.far = 130;
+        const sd = 36;
+        dirLight.shadow.camera.left = -sd;
+        dirLight.shadow.camera.right = sd;
+        dirLight.shadow.camera.top = sd;
+        dirLight.shadow.camera.bottom = -sd;
+        dirLight.shadow.bias = -0.0005;
+        scene.add(dirLight);
+
+        const fillLight = new THREE.DirectionalLight(0xeef4ff, 0.4);
+        fillLight.position.set(-28, 24, -20);
+        scene.add(fillLight);
+
+        // --- 10. UI & INDEPENDENT TOUR CONTROLLER ---
+        let activeTourHome = -1;
+        let activeFloorMode = 'all';
+        let globalExplodeTarget = 0;
+        let simSpeedMultiplier = 0.35; // Default calm pace
+        let isSimPaused = false;
+
+        const tourStatus = document.getElementById('tour-status');
+        const tourBadge = document.getElementById('tour-badge');
+        const tourBtns = document.querySelectorAll('.tour-btn');
+        const floorBtns = document.querySelectorAll('.floor-btn');
+
+        function animateCameraTo(pos, target, zoom) {
+            camAnim = {
+                startPos: camera.position.clone(),
+                endPos: new THREE.Vector3(...pos),
+                startTarget: controls.target.clone(),
+                endTarget: new THREE.Vector3(...target),
+                startZoom: camera.zoom,
+                endZoom: zoom,
+                progress: 0
+            };
+        }
+
+        function selectTourBuilding(homeIdx) {
+            activeTourHome = homeIdx;
+            tourBtns.forEach(b => b.classList.toggle('active', parseInt(b.dataset.home) === homeIdx));
+
+            if (homeIdx === -1) {
+                tourBadge.textContent = "All Homes";
+                tourStatus.textContent = "Viewing: Full Neighborhood Overview";
+                animateCameraTo([38, 44, 42], [0, 1.5, 0], 1.0);
+            } else {
+                const h = housesData[homeIdx];
+                tourBadge.textContent = `Home ${homeIdx + 1}`;
+                const floorLabel = activeFloorMode === '1f' ? '1st Floor Cutaway' : (activeFloorMode === '2f' ? '2nd Floor Cutaway' : 'Full 2-Story');
+                tourStatus.textContent = `Touring: ${h.name} — ${floorLabel}`;
+
+                const isSouthRow = h.zPos > 0;
+                const camOffsetX = isSouthRow ? -15 : 15;
+                const camOffsetZ = isSouthRow ? -16 : 16;
+                const targetY = activeFloorMode === '1f' ? 1.2 : (activeFloorMode === '2f' ? 3.8 : 2.6);
+
+                animateCameraTo(
+                    [h.xPos + camOffsetX, 19, h.zPos + camOffsetZ],
+                    [h.xPos, targetY, h.zPos],
+                    2.45
+                );
+            }
+        }
+
+        tourBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const idx = parseInt(btn.dataset.home);
+                if (idx !== -1 && activeFloorMode === 'all') {
+                    activeFloorMode = '2f';
+                    floorBtns.forEach(fb => fb.classList.toggle('active', fb.dataset.floor === '2f'));
+                }
+                selectTourBuilding(idx);
+            });
+        });
+
+        floorBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                activeFloorMode = btn.dataset.floor;
+                floorBtns.forEach(fb => fb.classList.toggle('active', fb.dataset.floor === activeFloorMode));
+                if (activeTourHome !== -1) {
+                    selectTourBuilding(activeTourHome);
+                }
+            });
+        });
+
+        // Scroll & Drag Sensitivity Slider
+        const sensSlider = document.getElementById('sens-slider');
+        const sensVal = document.getElementById('sens-val');
+        sensSlider.addEventListener('input', (e) => {
+            const val = parseFloat(e.target.value);
+            controls.zoomSpeed = val;
+            controls.rotateSpeed = val * 1.4;
+            controls.panSpeed = val * 1.4;
+            const label = val < 0.35 ? 'Gentle' : (val < 0.7 ? 'Medium' : 'Fast');
+            sensVal.textContent = `${val.toFixed(2)}x (${label})`;
+        });
+
+        // Simulation Speed & Pause Controls
+        const simSlider = document.getElementById('sim-slider');
+        const simVal = document.getElementById('sim-val');
+        const btnPauseSim = document.getElementById('btn-pause-sim');
+
+        simSlider.addEventListener('input', (e) => {
+            simSpeedMultiplier = parseFloat(e.target.value);
+            isSimPaused = (simSpeedMultiplier === 0);
+            btnPauseSim.classList.toggle('active', isSimPaused);
+            btnPauseSim.textContent = isSimPaused ? 'Resume People & Cars' : 'Pause People & Cars';
+            const label = simSpeedMultiplier === 0 ? 'Paused' : (simSpeedMultiplier < 0.6 ? 'Calm' : 'Normal');
+            simVal.textContent = `${simSpeedMultiplier.toFixed(2)}x (${label})`;
+        });
+
+        btnPauseSim.addEventListener('click', () => {
+            isSimPaused = !isSimPaused;
+            btnPauseSim.classList.toggle('active', isSimPaused);
+            btnPauseSim.textContent = isSimPaused ? 'Resume People & Cars' : 'Pause People & Cars';
+            if (isSimPaused) {
+                simVal.textContent = '0.00x (Paused)';
+            } else {
+                if (simSpeedMultiplier === 0) {
+                    simSpeedMultiplier = 0.35;
+                    simSlider.value = 0.35;
+                }
+                simVal.textContent = `${simSpeedMultiplier.toFixed(2)}x (Calm)`;
+            }
+        });
+
+        // Global Explode Slider
+        const explodeSlider = document.getElementById('explode-slider');
+        const explodeVal = document.getElementById('explode-val');
+        const btnRoofPeek = document.getElementById('btn-roof-peek');
+        const btnFullExplode = document.getElementById('btn-full-explode');
+
+        function setGlobalExplode(val) {
+            globalExplodeTarget = val;
+            explodeSlider.value = val;
+            explodeVal.textContent = `${Math.round(val * 100)}%`;
+            btnRoofPeek.classList.toggle('active', Math.abs(val - 0.35) < 0.05);
+            btnFullExplode.classList.toggle('active', val > 0.95);
+        }
+
+        explodeSlider.addEventListener('input', (e) => setGlobalExplode(parseFloat(e.target.value)));
+        btnRoofPeek.addEventListener('click', () => setGlobalExplode(globalExplodeTarget === 0.35 ? 0 : 0.35));
+        btnFullExplode.addEventListener('click', () => setGlobalExplode(globalExplodeTarget === 1 ? 0 : 1));
+
+        // Auto-Orbit & Rotation Speed Adjuster
+        const btnOrbit = document.getElementById('btn-orbit');
+        const speedSlider = document.getElementById('speed-slider');
+        const speedVal = document.getElementById('speed-val');
+
+        btnOrbit.addEventListener('click', () => {
+            controls.autoRotate = !controls.autoRotate;
+            btnOrbit.textContent = `Auto-Orbit: ${controls.autoRotate ? 'ON' : 'OFF'}`;
+            btnOrbit.classList.toggle('active', controls.autoRotate);
+        });
+
+        speedSlider.addEventListener('input', (e) => {
+            const spd = parseFloat(e.target.value);
+            controls.autoRotateSpeed = spd * 1.4;
+            speedVal.textContent = `${spd.toFixed(2)}x`;
+            if (spd > 0 && !controls.autoRotate) {
+                controls.autoRotate = true;
+                btnOrbit.textContent = 'Auto-Orbit: ON';
+                btnOrbit.classList.add('active');
+            }
+        });
+
+        // Day / Night Controls
+        const timeSlider = document.getElementById('time-slider');
+        const timeVal = document.getElementById('time-val');
+        const btnDay = document.getElementById('btn-day');
+        const btnSunset = document.getElementById('btn-sunset');
+        const btnNight = document.getElementById('btn-night');
+
+        function updateTimeOfDay(hour) {
+            timeSlider.value = hour;
+            const hrs = Math.floor(hour);
+            const mins = Math.floor((hour - hrs) * 60);
+            const timeStr = `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
+
+            const sunAngle = ((hour - 6) / 24) * Math.PI * 2;
+            const elevation = Math.sin(sunAngle);
+            const azimuth = Math.cos(sunAngle);
+
+            dirLight.position.set(azimuth * 38, Math.max(8, Math.abs(elevation) * 44 + 6), 26);
+
+            const dayFactor = THREE.MathUtils.clamp((elevation + 0.15) / 0.65, 0, 1);
+            const sunsetFactor = THREE.MathUtils.clamp(1 - Math.abs(elevation) * 2.8, 0, 1);
+            const nightFactor = 1 - dayFactor;
+
+            const daySky = new THREE.Color(0xebe9e4);
+            const sunsetSky = new THREE.Color(0xd99b78);
+            const nightSky = new THREE.Color(0x0f1523);
+
+            const skyColor = daySky.clone().lerp(nightSky, nightFactor);
+            if (sunsetFactor > 0) skyColor.lerp(sunsetSky, sunsetFactor * 0.65);
+            scene.background.copy(skyColor);
+
+            const daySun = new THREE.Color(0xfffcf5);
+            const sunsetSun = new THREE.Color(0xff7b3d);
+            const nightMoon = new THREE.Color(0x6b8cff);
+
+            dirLight.color.copy(daySun).lerp(nightMoon, nightFactor);
+            if (sunsetFactor > 0) dirLight.color.lerp(sunsetSun, sunsetFactor * 0.85);
+
+            dirLight.intensity = THREE.MathUtils.lerp(0.35, 1.55, dayFactor);
+            hemiLight.intensity = THREE.MathUtils.lerp(0.22, 0.9, dayFactor);
+            hemiLight.color.copy(daySun).lerp(nightMoon, nightFactor);
+
+            const warmIntensity = THREE.MathUtils.lerp(0.5, 3.6, nightFactor);
+            interiorLights.forEach(l => l.intensity = warmIntensity);
+            streetLights.forEach(l => l.intensity = THREE.MathUtils.lerp(0, 4.5, nightFactor));
+            carHeadlights.forEach(l => l.intensity = THREE.MathUtils.lerp(0.2, 5.0, nightFactor));
+
+            mats.lampGlow.emissiveIntensity = THREE.MathUtils.lerp(0.8, 3.5, nightFactor);
+            mats.ledGlow.emissiveIntensity = THREE.MathUtils.lerp(0.8, 2.8, nightFactor);
+
+            let period = 'Day';
+            if (hour < 6 || hour >= 20) period = 'Night';
+            else if (hour < 8 || hour >= 17.5) period = 'Golden Hour';
+            timeVal.textContent = `${timeStr} (${period})`;
+
+            btnDay.classList.toggle('active', hour >= 9 && hour <= 16);
+            btnSunset.classList.toggle('active', hour > 17 && hour < 19.5);
+            btnNight.classList.toggle('active', hour >= 20 || hour <= 5);
+        }
+
+        timeSlider.addEventListener('input', (e) => updateTimeOfDay(parseFloat(e.target.value)));
+        btnDay.addEventListener('click', () => updateTimeOfDay(13.5));
+        btnSunset.addEventListener('click', () => updateTimeOfDay(18.3));
+        btnNight.addEventListener('click', () => updateTimeOfDay(22.0));
+
+        // Camera Presets & Gentle Zoom Buttons
+        document.getElementById('cam-iso').addEventListener('click', () => selectTourBuilding(-1));
+        document.getElementById('cam-top').addEventListener('click', () => {
+            animateCameraTo([0, 72, 0.01], [0, 0, 0], 0.92);
+        });
+        document.getElementById('cam-zoom-in').addEventListener('click', () => {
+            camera.zoom = Math.min(camera.zoom * 1.12, 5.0);
+            camera.updateProjectionMatrix();
+        });
+        document.getElementById('cam-zoom-out').addEventListener('click', () => {
+            camera.zoom = Math.max(camera.zoom / 1.12, 0.45);
+            camera.updateProjectionMatrix();
+        });
+
+        // --- 11. ANIMATION LOOP ---
+        function updateHumansAndCars(delta) {
+            if (isSimPaused || simSpeedMultiplier <= 0) return;
+
+            const simDelta = delta * simSpeedMultiplier;
+
+            allHumans.forEach(h => {
+                const target = h.waypoints[h.currentWp];
+                const pos = h.root.position;
+                const dir = new THREE.Vector3().subVectors(target, pos);
+                dir.y = 0;
+                const dist = dir.length();
+
+                if (dist < 0.06) {
+                    h.currentWp = (h.currentWp + 1) % h.waypoints.length;
+                } else {
+                    dir.normalize();
+                    const step = Math.min(dist, h.speed * simDelta);
+                    pos.addScaledVector(dir, step);
+
+                    const targetAngle = Math.atan2(dir.x, dir.z);
+                    let angleDiff = targetAngle - h.root.rotation.y;
+                    while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+                    while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+                    h.root.rotation.y += angleDiff * Math.min(1, simDelta * 8);
+
+                    h.walkTime += simDelta * h.speed * 6.0;
+                    const swing = Math.sin(h.walkTime) * 0.42;
+
+                    h.leftLeg.rotation.x = swing;
+                    h.rightLeg.rotation.x = -swing;
+                    h.leftArm.rotation.x = -swing * 0.7;
+                    h.rightArm.rotation.x = swing * 0.7;
+
+                    h.body.position.y = Math.abs(Math.cos(h.walkTime)) * 0.025;
+                    h.body.rotation.z = Math.sin(h.walkTime) * 0.015;
+                    h.headGroup.rotation.y = Math.sin(h.walkTime * 0.5) * 0.1;
+                }
+            });
+
+            allCars.forEach(c => {
+                c.car.position.x += c.dirX * c.speed * simDelta;
+                if (c.dirX > 0 && c.car.position.x > c.limit) c.car.position.x = -c.limit;
+                if (c.dirX < 0 && c.car.position.x < -c.limit) c.car.position.x = c.limit;
+
+                c.wheels.forEach(w => {
+                    w.rotation.z -= c.dirX * c.speed * simDelta * 2.2;
+                });
+            });
+        }
+
+        function updateBuildingCutaways(delta) {
+            housesData.forEach(h => {
+                const isToured = (activeTourHome === -1 || activeTourHome === h.index);
+
+                let targetRoofY = storyHeight * 2 + globalExplodeTarget * 11.0;
+                let targetStory2Y = storyHeight + globalExplodeTarget * 5.0;
+                let targetWallsLift = Math.max(0, (globalExplodeTarget - 0.35) / 0.65) * 2.0;
+
+                if (isToured) {
+                    if (activeFloorMode === '2f') {
+                        targetRoofY = Math.max(targetRoofY, storyHeight * 2 + 12.0);
+                    } else if (activeFloorMode === '1f') {
+                        targetRoofY = Math.max(targetRoofY, storyHeight * 2 + 15.0);
+                        targetStory2Y = Math.max(targetStory2Y, storyHeight + 11.5);
+                    }
+                }
+
+                // Gentle, smooth vertical transition speed
+                const lerpSpeed = Math.min(1, delta * 4.5);
+                h.roofGroup.position.y += (targetRoofY - h.roofGroup.position.y) * lerpSpeed;
+                h.story2Group.position.y += (targetStory2Y - h.story2Group.position.y) * lerpSpeed;
+                h.f1.wallsGroup.position.y += (targetWallsLift - h.f1.wallsGroup.position.y) * lerpSpeed;
+                h.f2.wallsGroup.position.y += (targetWallsLift - h.f2.wallsGroup.position.y) * lerpSpeed;
+            });
+        }
+
+        window.addEventListener('resize', () => {
+            const aspect = window.innerWidth / window.innerHeight;
+            camera.left = -d * aspect;
+            camera.right = d * aspect;
+            camera.top = d;
+            camera.bottom = -d;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        const clock = new THREE.Clock();
+        updateTimeOfDay(13.5);
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const delta = Math.min(clock.getDelta(), 0.1);
+
+            updateBuildingCutaways(delta);
+            updateHumansAndCars(delta);
+
+            if (camAnim) {
+                camAnim.progress += delta * 1.25; // Slower, gentler camera flight
+                const t = Math.min(1, camAnim.progress);
+                const ease = 1 - Math.pow(1 - t, 3);
+                camera.position.lerpVectors(camAnim.startPos, camAnim.endPos, ease);
+                controls.target.lerpVectors(camAnim.startTarget, camAnim.endTarget, ease);
+                camera.zoom = THREE.MathUtils.lerp(camAnim.startZoom, camAnim.endZoom, ease);
+                camera.updateProjectionMatrix();
+                if (t >= 1) camAnim = null;
+            }
+
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        animate();
+    </script>
+</body>
+</html>
